@@ -129,7 +129,10 @@
             "dependsOn": [
                 "simulator (dev): make pdx"
             ],
-            "group": "build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
             "presentation": {
                 "reveal": "always",
             }
