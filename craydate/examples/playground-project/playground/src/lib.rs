@@ -2,8 +2,10 @@
 #![deny(clippy::all)]
 #![feature(never_type)]
 
+use core::f32::consts::PI;
+
 use craydate::*;
-use euclid::Trig;
+use euclid::{Point2D, Trig, UnknownUnit};
 
 extern crate alloc;
 
@@ -89,8 +91,7 @@ async fn main(mut api: craydate::Api) -> ! {
     }
   }
   graphics.draw_bitmap(&copy, 0, 30, BitmapFlip::kBitmapUnflipped);
-
-  let id = graphics.push_context_bitmap(copy);
+  graphics.push_context_bitmap(copy);
   graphics.pop_context();
 
   let mut i32callbacks = Callbacks::<i32>::new();
@@ -135,6 +136,34 @@ async fn main(mut api: craydate::Api) -> ! {
       }
     }
 
+    // Draw Background:
+    let graphics = &mut api.graphics;
+    let grey50 = Pattern::new_unmasked(grey50_colors);
+    graphics.clear(&grey50);
+
+    match inputs.crank() {
+      Crank::Undocked {
+        angle,
+        change: _angle_delta,
+      } => {
+        let angle = (angle - 90.) * PI / 180.; // TODO: this is hackery to flip the y axis. :'(
+
+        let origin = Point2D::new(300, 120);
+        let length = 75f32;
+        let direction: Point2D<i32, UnknownUnit> =
+          Point2D::new((angle.cos() * length) as i32, (angle.sin() * length) as i32);
+
+        let destination = Point2D::new(origin.x + direction.x, origin.y + direction.y);
+
+        api.graphics.draw_line(
+          origin,
+          destination,
+          3,
+          Color::Solid(SolidColor::kColorWhite),
+        )
+      }
+      _ => {}
+    }
     api.graphics.draw_fps(400 - 15, 0);
   }
 }
