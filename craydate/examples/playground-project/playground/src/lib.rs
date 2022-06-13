@@ -236,8 +236,10 @@ fn constrain_chain_lengths(chain_start: &Vec2<f32>, chain: &mut [ChainPoint]) {
   let delta = b - chain_start;
   let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
   let fraction = (30. - distance) / distance;
-  let delta = delta * fraction;
-  chain[0].position = b + delta;
+  if fraction < 0.0 {
+    let delta = delta * fraction;
+    chain[0].position = b + delta;
+  }
 
   // the rest of the chain
   for i in 0..(chain.len() - 1) {
@@ -246,8 +248,10 @@ fn constrain_chain_lengths(chain_start: &Vec2<f32>, chain: &mut [ChainPoint]) {
     let delta = b - a;
     let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
     let fraction = ((30. - distance) / distance) / 2.;
-    let delta = delta * fraction;
-    chain[i].position = a - delta;
-    chain[i + 1].position = b + delta;
+    if fraction < 0.0 {
+      let delta = delta * fraction;
+      chain[i].position = a - delta;
+      chain[i + 1].position = b + delta;
+    }
   }
 }
