@@ -5,9 +5,17 @@
 use core::f32::consts::PI;
 
 use craydate::*;
-use euclid::{Point2D, Trig, UnknownUnit};
+use euclid::{Point2D, UnknownUnit};
+use micromath::F32Ext;
+use nalgebra::Vector2 as Vec2;
 
 extern crate alloc;
+
+#[derive(Default)]
+struct ChainPoint {
+  position: Vec2<f32>,
+  prev: Vec2<f32>,
+}
 
 #[craydate::main]
 async fn main(mut api: craydate::Api) -> ! {
@@ -103,6 +111,13 @@ async fn main(mut api: craydate::Api) -> ! {
 
   let events = api.system.system_event_watcher();
 
+  let mut chain = [
+    ChainPoint::default(),
+    ChainPoint::default(),
+    ChainPoint::default(),
+    ChainPoint::default(),
+  ];
+
   // This is the main game
   loop {
     let (inputs, frame_number) = match events.next().await {
@@ -141,12 +156,14 @@ async fn main(mut api: craydate::Api) -> ! {
     let grey50 = Pattern::new_unmasked(grey50_colors);
     graphics.clear(&grey50);
 
+    let mut chain_start = Vec2::default();
+
     match inputs.crank() {
       Crank::Undocked {
         angle,
         change: _angle_delta,
       } => {
-        let angle = (angle - 90.) * PI / 180.; // TODO: this is hackery to flip the y axis. :'(
+        let angle = (angle - 90.) * PI / 180.; // TODO: this is hackery to flip the y axis. :'( It should probably be '+'
 
         let origin = Point2D::new(300, 120);
         let length = 75f32;
@@ -154,6 +171,7 @@ async fn main(mut api: craydate::Api) -> ! {
           Point2D::new((angle.cos() * length) as i32, (angle.sin() * length) as i32);
 
         let destination = Point2D::new(origin.x + direction.x, origin.y + direction.y);
+        chain_start = Vec2::new(destination.x as f32, destination.y as f32);
 
         api.graphics.draw_line(
           origin,
@@ -164,6 +182,79 @@ async fn main(mut api: craydate::Api) -> ! {
       }
       _ => {}
     }
+
+    // Solve Chain
+    move_chain(&mut chain);
+    for _ in 0..10 {
+      constrain_chain_lengths(&chain_start, &mut chain);
+    }
+    chain_set_prevs(&mut chain);
+
+    // Draw Chain
+    api.graphics.draw_line(
+      v_as_p(&chain_start),
+      v_as_p(&chain[0].position),
+      3,
+      Color::Solid(SolidColor::kColorWhite),
+    );
+    chain.windows(2).for_each(|links| {
+      api.graphics.draw_line(
+        v_as_p(&links[0].position),
+        v_as_p(&links[1].position),
+        3,
+        Color::Solid(SolidColor::kColorWhite),
+      );
+    });
+
+    // Draw fps
     api.graphics.draw_fps(400 - 15, 0);
+  }
+}
+
+fn v_as_p(v: &Vec2<f32>) -> Point2D<i32, UnknownUnit> {
+  Point2D::new(v.x as i32, v.y as i32)
+}
+
+fn move_chain(chain: &mut [ChainPoint]) {
+  let grav = 3.9f32;
+  let drag = 1.0f32;
+
+  chain.iter_mut().for_each(|link| {
+    let delta = (link.position - link.prev) * drag;
+    //link.prev = link.position;
+    link.position += delta * 5.;
+    link.position.y += grav
+  });
+}
+
+fn chain_set_prevs(chain: &mut [ChainPoint]) {
+  chain.iter_mut().for_each(|link| {
+    link.prev = link.position.clone();
+  });
+}
+
+fn constrain_chain_lengths(chain_start: &Vec2<f32>, chain: &mut [ChainPoint]) {
+  if chain.len() < 2 {
+    return;
+  }
+
+  // first link, relative to chain_start
+  let b = chain[0].position;
+  let delta = b - chain_start;
+  let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+  let fraction = (30. - distance) / distance;
+  let delta = delta * fraction;
+  chain[0].position = b + delta;
+
+  // the rest of the chain
+  for i in 0..(chain.len() - 1) {
+    let a = chain[i].position;
+    let b = chain[i + 1].position;
+    let delta = b - a;
+    let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+    let fraction = ((30. - distance) / distance) / 2.;
+    let delta = delta * fraction;
+    chain[i].position = a - delta;
+    chain[i + 1].position = b + delta;
   }
 }

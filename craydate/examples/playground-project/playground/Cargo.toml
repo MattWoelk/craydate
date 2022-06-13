@@ -6,3 +6,5 @@ version = "0.1.0"
 [dependencies]
 craydate = "0.1"
 euclid = {version = "0.22", default-features = false, features = ["libm"]}
+nalgebra = {version = "0.31.0", default-features = false}
+micromath = "2.0.0"
