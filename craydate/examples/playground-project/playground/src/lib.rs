@@ -188,7 +188,6 @@ async fn main(mut api: craydate::Api) -> ! {
     for _ in 0..10 {
       constrain_chain_lengths(&chain_start, &mut chain);
     }
-    chain_set_prevs(&mut chain);
 
     // Draw Chain
     api.graphics.draw_line(
@@ -216,20 +215,14 @@ fn v_as_p(v: &Vec2<f32>) -> Point2D<i32, UnknownUnit> {
 }
 
 fn move_chain(chain: &mut [ChainPoint]) {
-  let grav = 3.9f32;
-  let drag = 1.0f32;
+  let grav = 3.9;
+  let drag = 1.0;
 
   chain.iter_mut().for_each(|link| {
     let delta = (link.position - link.prev) * drag;
-    //link.prev = link.position;
-    link.position += delta * 5.;
+    link.prev = link.position;
+    link.position += delta;
     link.position.y += grav
-  });
-}
-
-fn chain_set_prevs(chain: &mut [ChainPoint]) {
-  chain.iter_mut().for_each(|link| {
-    link.prev = link.position.clone();
   });
 }
 
