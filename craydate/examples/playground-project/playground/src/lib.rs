@@ -5,7 +5,7 @@
 use core::f32::consts::PI;
 
 use craydate::*;
-use euclid::{Point2D, UnknownUnit};
+use euclid::{Point2D, Rect, Size2D, UnknownUnit};
 use micromath::F32Ext;
 use nalgebra::Vector2 as Vec2;
 
@@ -118,6 +118,12 @@ async fn main(mut api: craydate::Api) -> ! {
     ChainPoint::default(),
   ];
 
+  let origin = Point2D::new(300, 120);
+
+  let mut shield_offset: f32 = 0.;
+  let mut shield_position = p_to_v(&origin);
+  shield_position.x -= 90.;
+
   // This is the main game
   loop {
     let (inputs, frame_number) = match events.next().await {
@@ -161,11 +167,12 @@ async fn main(mut api: craydate::Api) -> ! {
     match inputs.crank() {
       Crank::Undocked {
         angle,
-        change: _angle_delta,
+        change: angle_delta,
       } => {
         let angle = (angle - 90.) * PI / 180.; // TODO: this is hackery to flip the y axis. :'( It should probably be '+'
 
-        let origin = Point2D::new(300, 120);
+        shield_offset = (shield_offset + angle_delta).clamp(-190., 0.);
+
         let length = 75f32;
         let direction: Point2D<i32, UnknownUnit> =
           Point2D::new((angle.cos() * length) as i32, (angle.sin() * length) as i32);
@@ -191,27 +198,48 @@ async fn main(mut api: craydate::Api) -> ! {
 
     // Draw Chain
     api.graphics.draw_line(
-      v_as_p(&chain_start),
-      v_as_p(&chain[0].position),
+      v_to_p(&chain_start),
+      v_to_p(&chain[0].position),
       3,
       Color::Solid(SolidColor::kColorWhite),
     );
     chain.windows(2).for_each(|links| {
       api.graphics.draw_line(
-        v_as_p(&links[0].position),
-        v_as_p(&links[1].position),
+        v_to_p(&links[0].position),
+        v_to_p(&links[1].position),
         3,
         Color::Solid(SolidColor::kColorWhite),
       );
     });
+
+    // Draw Shield
+    let shield_width = 40;
+    let shield_height = 80;
+    api.graphics.draw_rect(
+      Rect {
+        origin: v_to_p(
+          &(shield_position
+            - Vec2::new(
+              shield_width as f32 / 2.,
+              shield_height as f32 / 2. + shield_offset / 3.,
+            )),
+        ),
+        size: Size2D::new(shield_width, shield_height),
+      },
+      Color::Solid(SolidColor::kColorWhite),
+    );
 
     // Draw fps
     api.graphics.draw_fps(400 - 15, 0);
   }
 }
 
-fn v_as_p(v: &Vec2<f32>) -> Point2D<i32, UnknownUnit> {
+fn v_to_p(v: &Vec2<f32>) -> Point2D<i32, UnknownUnit> {
   Point2D::new(v.x as i32, v.y as i32)
+}
+
+fn p_to_v(p: &Point2D<i32, UnknownUnit>) -> Vec2<f32> {
+  Vec2::new(p.x as f32, p.y as f32)
 }
 
 fn move_chain(chain: &mut [ChainPoint]) {
