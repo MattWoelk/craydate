@@ -275,7 +275,8 @@ fn constrain_chain_lengths(chain_start: &Vec2<f32>, chain: &mut [ChainPoint]) {
     let b = chain[i + 1].position;
     let delta = b - a;
     let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-    let fraction = ((30. - distance) / distance) / 2.;
+    let link_length = if i < chain.len() - 2 { 30. } else { 75. };
+    let fraction = ((link_length - distance) / distance) / 2.;
     if fraction < 0.0 {
       let delta = delta * fraction;
       chain[i].position = a - delta;
