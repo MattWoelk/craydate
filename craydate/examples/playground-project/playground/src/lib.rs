@@ -130,6 +130,7 @@ async fn main(mut api: craydate::Api) -> ! {
   let events = api.system.system_event_watcher();
 
   let mut chain = vec![
+    ChainPoint::new(75.),
     ChainPoint::new(30.),
     ChainPoint::new(30.),
     ChainPoint::new(30.),
@@ -202,13 +203,15 @@ async fn main(mut api: craydate::Api) -> ! {
           origin,
           destination,
           3,
-          Color::Solid(SolidColor::kColorWhite),
+          Color::Solid(SolidColor::kColorBlack),
         )
       }
       _ => {}
     }
 
     // Solve Chain
+    chain[0].prev = chain[0].position;
+    chain[0].position = chain_start;
     move_chain(&mut chain);
     for _ in 0..10 {
       constrain_chain_lengths(&chain_start, &mut chain);
