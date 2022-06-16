@@ -230,6 +230,20 @@ async fn main(mut api: craydate::Api) -> ! {
       );
     });
 
+    // Draw motion blur
+    chain.windows(2).for_each(|links| {
+      api.graphics.fill_polygon(
+        &[
+          v_to_p(&links[0].position),
+          v_to_p(&links[0].prev),
+          v_to_p(&links[1].prev),
+          v_to_p(&links[1].position),
+        ],
+        Color::Solid(SolidColor::kColorWhite),
+        PolygonFillRule::kPolygonFillNonZero,
+      );
+    });
+
     // Draw Shield
     let shield_width = 40;
     let shield_height = 80;
