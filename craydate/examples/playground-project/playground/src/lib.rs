@@ -2,6 +2,8 @@
 #![deny(clippy::all)]
 #![feature(never_type)]
 
+use alloc::vec;
+use alloc::vec::Vec;
 use core::f32::consts::PI;
 
 use craydate::*;
@@ -15,6 +17,22 @@ extern crate alloc;
 struct ChainPoint {
   position: Vec2<f32>,
   prev: Vec2<f32>,
+  length: f32,
+}
+
+impl ChainPoint {
+  fn new(length: f32) -> ChainPoint {
+    ChainPoint {
+      length,
+      ..Default::default()
+    }
+  }
+}
+
+struct Weapon {
+  chain: Vec<ChainPoint>,
+  handle_length: f32,
+  stiffness: i32,
 }
 
 #[craydate::main]
@@ -111,11 +129,11 @@ async fn main(mut api: craydate::Api) -> ! {
 
   let events = api.system.system_event_watcher();
 
-  let mut chain = [
-    ChainPoint::default(),
-    ChainPoint::default(),
-    ChainPoint::default(),
-    ChainPoint::default(),
+  let mut chain = vec![
+    ChainPoint::new(30.),
+    ChainPoint::new(30.),
+    ChainPoint::new(30.),
+    ChainPoint::new(75.),
   ];
 
   let origin = Point2D::new(300, 120);
@@ -275,7 +293,7 @@ fn constrain_chain_lengths(chain_start: &Vec2<f32>, chain: &mut [ChainPoint]) {
     let b = chain[i + 1].position;
     let delta = b - a;
     let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-    let link_length = if i < chain.len() - 2 { 30. } else { 75. };
+    let link_length = chain[i + 1].length;
     let fraction = ((link_length - distance) / distance) / 2.;
     if fraction < 0.0 {
       let delta = delta * fraction;
