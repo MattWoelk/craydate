@@ -137,11 +137,11 @@ async fn main(mut api: craydate::Api) -> ! {
     ChainPoint::new(75.),
   ];
 
-  let origin = Point2D::new(300, 120);
+  let origin = Point2D::new(100, 120);
 
   let mut shield_offset: f32 = 0.;
   let mut shield_position = p_to_v(&origin);
-  shield_position.x -= 90.;
+  shield_position.x += 90.;
 
   // This is the main game
   loop {
