@@ -18,14 +18,21 @@ struct ChainPoint {
   position: Vec2<f32>,
   prev: Vec2<f32>,
   length: f32,
+  blur: bool,
 }
 
 impl ChainPoint {
   fn new(length: f32) -> ChainPoint {
     ChainPoint {
       length,
+      blur: true,
       ..Default::default()
     }
+  }
+
+  fn blur(mut self, blur: bool) -> Self {
+    self.blur = blur;
+    self
   }
 }
 
@@ -130,10 +137,10 @@ async fn main(mut api: craydate::Api) -> ! {
   let events = api.system.system_event_watcher();
 
   let mut chain = vec![
-    ChainPoint::new(75.),
-    ChainPoint::new(30.),
-    ChainPoint::new(30.),
-    ChainPoint::new(30.),
+    ChainPoint::new(75.).blur(true),
+    ChainPoint::new(30.).blur(true),
+    ChainPoint::new(30.).blur(true),
+    ChainPoint::new(30.).blur(true),
     ChainPoint::new(75.),
   ];
 
@@ -235,16 +242,18 @@ async fn main(mut api: craydate::Api) -> ! {
 
     // Draw motion blur
     chain.windows(2).for_each(|links| {
-      api.graphics.fill_polygon(
-        &[
-          v_to_p(&links[0].position),
-          v_to_p(&links[0].prev),
-          v_to_p(&links[1].prev),
-          v_to_p(&links[1].position),
-        ],
-        Color::Solid(SolidColor::kColorWhite),
-        PolygonFillRule::kPolygonFillNonZero,
-      );
+      if links[0].blur {
+        api.graphics.fill_polygon(
+          &[
+            v_to_p(&links[0].position),
+            v_to_p(&links[0].prev),
+            v_to_p(&links[1].prev),
+            v_to_p(&links[1].position),
+          ],
+          Color::Solid(SolidColor::kColorWhite),
+          PolygonFillRule::kPolygonFillNonZero,
+        );
+      }
     });
 
     // Draw Shield
