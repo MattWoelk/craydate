@@ -13,9 +13,12 @@ use nalgebra::Vector2 as Vec2;
 
 extern crate alloc;
 
+const DOUBLE_BLUR: bool = false;
+
 #[derive(Default)]
 struct ChainPoint {
   position: Vec2<f32>,
+  prev_prev: Vec2<f32>,
   prev: Vec2<f32>,
   length: f32,
   blur: bool,
@@ -217,6 +220,7 @@ async fn main(mut api: craydate::Api) -> ! {
     }
 
     // Solve Chain
+    chain[0].prev_prev = chain[0].prev;
     chain[0].prev = chain[0].position;
     chain[0].position = chain_start;
     move_chain(&mut chain);
@@ -253,6 +257,18 @@ async fn main(mut api: craydate::Api) -> ! {
           Color::Solid(SolidColor::kColorWhite),
           PolygonFillRule::kPolygonFillNonZero,
         );
+        if DOUBLE_BLUR {
+          api.graphics.fill_polygon(
+            &[
+              v_to_p(&links[0].prev),
+              v_to_p(&links[0].prev_prev),
+              v_to_p(&links[1].prev_prev),
+              v_to_p(&links[1].prev),
+            ],
+            Color::Solid(SolidColor::kColorWhite),
+            PolygonFillRule::kPolygonFillNonZero,
+          );
+        }
       }
     });
 
@@ -292,6 +308,7 @@ fn move_chain(chain: &mut [ChainPoint]) {
 
   chain.iter_mut().for_each(|link| {
     let delta = (link.position - link.prev) * drag;
+    link.prev_prev = link.prev;
     link.prev = link.position;
     link.position += delta;
     link.position.y += grav
