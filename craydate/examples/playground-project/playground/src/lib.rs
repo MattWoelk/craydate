@@ -197,7 +197,7 @@ async fn main(mut api: craydate::Api) -> ! {
       } => {
         let angle = (angle - 90.) * PI / 180.; // TODO: this is hackery to flip the y axis. :'( It should probably be '+'
 
-        shield_offset = (shield_offset + angle_delta).clamp(-190., 0.);
+        shield_offset = (shield_offset - angle_delta).clamp(-190., 0.);
 
         let length = 75f32;
         let direction: Point2D<i32, UnknownUnit> =
