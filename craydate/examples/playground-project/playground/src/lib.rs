@@ -28,7 +28,7 @@ impl ChainPoint {
   fn new(length: f32) -> ChainPoint {
     ChainPoint {
       length,
-      blur: true,
+      blur: false,
       ..Default::default()
     }
   }
@@ -139,12 +139,35 @@ async fn main(mut api: craydate::Api) -> ! {
 
   let events = api.system.system_event_watcher();
 
-  let mut chain = vec![
-    ChainPoint::new(75.).blur(true),
-    ChainPoint::new(30.).blur(true),
-    ChainPoint::new(30.).blur(true),
-    ChainPoint::new(30.).blur(true),
-    ChainPoint::new(75.),
+  let mut current_weapon = 0;
+  let mut weapons = vec![
+    Weapon {
+      chain: vec![
+        ChainPoint::new(75.).blur(true),
+        ChainPoint::new(30.).blur(true),
+        ChainPoint::new(30.).blur(true),
+        ChainPoint::new(30.).blur(true),
+        ChainPoint::new(75.),
+      ],
+      handle_length: 75.,
+      stiffness: 10,
+    },
+    Weapon {
+      chain: vec![
+        ChainPoint::new(75.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.),
+        ChainPoint::new(15.).blur(true),
+        ChainPoint::new(30.),
+      ],
+      handle_length: 75.,
+      stiffness: 10,
+    },
   ];
 
   let origin = Point2D::new(100, 120);
@@ -179,6 +202,7 @@ async fn main(mut api: craydate::Api) -> ! {
       match event {
         craydate::ButtonEvent::Push => {
           log(format!("{:?} pushed on frame {}", button, frame_number));
+          current_weapon = (current_weapon + 1) % weapons.len();
         }
         craydate::ButtonEvent::Release => {
           log(format!("{:?} released on frame {}", button, frame_number));
@@ -220,32 +244,40 @@ async fn main(mut api: craydate::Api) -> ! {
     }
 
     // Solve Chain
-    chain[0].prev_prev = chain[0].prev;
-    chain[0].prev = chain[0].position;
-    chain[0].position = chain_start;
-    move_chain(&mut chain);
+    weapons[current_weapon].chain[0].prev_prev = weapons[current_weapon].chain[0].prev;
+    weapons[current_weapon].chain[0].prev = weapons[current_weapon].chain[0].position;
+    weapons[current_weapon].chain[0].position = chain_start;
+    move_chain(&mut weapons[current_weapon].chain);
     for _ in 0..10 {
-      constrain_chain_lengths(&chain_start, &mut chain);
+      constrain_chain_lengths(&chain_start, &mut weapons[current_weapon].chain);
     }
 
     // Draw Chain
     api.graphics.draw_line(
       v_to_p(&chain_start),
-      v_to_p(&chain[0].position),
+      v_to_p(&weapons[current_weapon].chain[0].position),
       3,
-      Color::Solid(SolidColor::kColorWhite),
+      Color::Solid(if weapons[current_weapon].chain[0].blur {
+        SolidColor::kColorWhite
+      } else {
+        SolidColor::kColorBlack
+      }),
     );
-    chain.windows(2).for_each(|links| {
+    weapons[current_weapon].chain.windows(2).for_each(|links| {
       api.graphics.draw_line(
         v_to_p(&links[0].position),
         v_to_p(&links[1].position),
         3,
-        Color::Solid(SolidColor::kColorWhite),
+        Color::Solid(if links[0].blur {
+          SolidColor::kColorWhite
+        } else {
+          SolidColor::kColorBlack
+        }),
       );
     });
 
     // Draw motion blur
-    chain.windows(2).for_each(|links| {
+    weapons[current_weapon].chain.windows(2).for_each(|links| {
       if links[0].blur {
         api.graphics.fill_polygon(
           &[
