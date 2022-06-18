@@ -13,13 +13,10 @@ use nalgebra::Vector2 as Vec2;
 
 extern crate alloc;
 
-const DOUBLE_BLUR: bool = false;
-
 #[derive(Default)]
 struct ChainPoint {
-  position: Vec2<f32>,
-  prev_prev: Vec2<f32>,
-  prev: Vec2<f32>,
+  /// 0 is the most recent
+  positions: Vec<Vec2<f32>>,
   length: f32,
   blur: bool,
 }
@@ -27,6 +24,7 @@ struct ChainPoint {
 impl ChainPoint {
   fn new(length: f32) -> ChainPoint {
     ChainPoint {
+      positions: vec![Vec2::default(); 20], // TODO: make 20 into blur_frames
       length,
       blur: false,
       ..Default::default()
@@ -41,8 +39,9 @@ impl ChainPoint {
 
 struct Weapon {
   chain: Vec<ChainPoint>,
-  handle_length: f32,
+  handle_length: f32, // TODO: use this
   stiffness: i32,
+  blur_frames: usize,
 }
 
 #[craydate::main]
@@ -151,6 +150,7 @@ async fn main(mut api: craydate::Api) -> ! {
       ],
       handle_length: 75.,
       stiffness: 10,
+      blur_frames: 1,
     },
     Weapon {
       chain: vec![
@@ -166,7 +166,8 @@ async fn main(mut api: craydate::Api) -> ! {
         ChainPoint::new(30.),
       ],
       handle_length: 75.,
-      stiffness: 10,
+      stiffness: 20,
+      blur_frames: 4,
     },
   ];
 
@@ -243,30 +244,21 @@ async fn main(mut api: craydate::Api) -> ! {
       _ => {}
     }
 
+    let blur_frames = weapons[current_weapon].blur_frames;
+    let stiffness = weapons[current_weapon].stiffness;
+    let mut chain = &mut weapons[current_weapon].chain;
+
     // Solve Chain
-    weapons[current_weapon].chain[0].prev_prev = weapons[current_weapon].chain[0].prev;
-    weapons[current_weapon].chain[0].prev = weapons[current_weapon].chain[0].position;
-    weapons[current_weapon].chain[0].position = chain_start;
-    move_chain(&mut weapons[current_weapon].chain);
-    for _ in 0..10 {
-      constrain_chain_lengths(&chain_start, &mut weapons[current_weapon].chain);
+    move_chain(&mut chain, chain_start, blur_frames);
+    for _ in 0..stiffness {
+      constrain_chain_lengths(&mut chain);
     }
 
     // Draw Chain
-    api.graphics.draw_line(
-      v_to_p(&chain_start),
-      v_to_p(&weapons[current_weapon].chain[0].position),
-      3,
-      Color::Solid(if weapons[current_weapon].chain[0].blur {
-        SolidColor::kColorWhite
-      } else {
-        SolidColor::kColorBlack
-      }),
-    );
-    weapons[current_weapon].chain.windows(2).for_each(|links| {
+    chain.windows(2).for_each(|links| {
       api.graphics.draw_line(
-        v_to_p(&links[0].position),
-        v_to_p(&links[1].position),
+        v_to_p(&links[0].positions[0]),
+        v_to_p(&links[1].positions[0]),
         3,
         Color::Solid(if links[0].blur {
           SolidColor::kColorWhite
@@ -277,32 +269,22 @@ async fn main(mut api: craydate::Api) -> ! {
     });
 
     // Draw motion blur
-    weapons[current_weapon].chain.windows(2).for_each(|links| {
-      if links[0].blur {
-        api.graphics.fill_polygon(
-          &[
-            v_to_p(&links[0].position),
-            v_to_p(&links[0].prev),
-            v_to_p(&links[1].prev),
-            v_to_p(&links[1].position),
-          ],
-          Color::Solid(SolidColor::kColorWhite),
-          PolygonFillRule::kPolygonFillNonZero,
-        );
-        if DOUBLE_BLUR {
+    for p in 0..blur_frames {
+      for l in 0..chain.len() - 1 {
+        if chain[l].blur {
           api.graphics.fill_polygon(
             &[
-              v_to_p(&links[0].prev),
-              v_to_p(&links[0].prev_prev),
-              v_to_p(&links[1].prev_prev),
-              v_to_p(&links[1].prev),
+              v_to_p(&chain[l].positions[p]),
+              v_to_p(&chain[l].positions[p + 1]),
+              v_to_p(&chain[l + 1].positions[p + 1]),
+              v_to_p(&chain[l + 1].positions[p]),
             ],
             Color::Solid(SolidColor::kColorWhite),
             PolygonFillRule::kPolygonFillNonZero,
           );
         }
       }
-    });
+    }
 
     // Draw Shield
     let shield_width = 40;
@@ -334,46 +316,56 @@ fn p_to_v(p: &Point2D<i32, UnknownUnit>) -> Vec2<f32> {
   Vec2::new(p.x as f32, p.y as f32)
 }
 
-fn move_chain(chain: &mut [ChainPoint]) {
+fn move_chain(chain: &mut [ChainPoint], chain_start: Vec2<f32>, blur_frames: usize) {
   let grav = 3.9;
   let drag = 1.0;
 
-  chain.iter_mut().for_each(|link| {
-    let delta = (link.position - link.prev) * drag;
-    link.prev_prev = link.prev;
-    link.prev = link.position;
-    link.position += delta;
-    link.position.y += grav
+  chain.iter_mut().enumerate().for_each(|(i, link)| {
+    let delta = (link.positions[0] - link.positions[1]) * drag;
+
+    // backup the previous positions
+    for i in (0..blur_frames).rev() {
+      link.positions[i + 1] = link.positions[i];
+    }
+
+    // If 1st link, set it to chain_start
+    if i == 0 {
+      link.positions[0] = chain_start;
+    } else {
+      link.positions[0] += delta;
+      link.positions[0].y += grav;
+    }
   });
 }
 
-fn constrain_chain_lengths(chain_start: &Vec2<f32>, chain: &mut [ChainPoint]) {
+fn constrain_chain_lengths(chain: &mut [ChainPoint]) {
   if chain.len() < 2 {
     return;
   }
 
-  // first link, relative to chain_start
-  let b = chain[0].position;
-  let delta = b - chain_start;
+  // first link, where its base does not move
+  let a = chain[0].positions[0];
+  let b = chain[1].positions[0];
+  let delta = b - a;
   let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
-  let fraction = (30. - distance) / distance;
+  let fraction = (30. - distance) / distance; // TODO: this needs to use arm_length
   if fraction < 0.0 {
     let delta = delta * fraction;
-    chain[0].position = b + delta;
+    chain[1].positions[0] = b + delta;
   }
 
   // the rest of the chain
-  for i in 0..(chain.len() - 1) {
-    let a = chain[i].position;
-    let b = chain[i + 1].position;
+  for i in 1..(chain.len() - 1) {
+    let a = chain[i].positions[0];
+    let b = chain[i + 1].positions[0];
     let delta = b - a;
     let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
     let link_length = chain[i + 1].length;
     let fraction = ((link_length - distance) / distance) / 2.;
     if fraction < 0.0 {
       let delta = delta * fraction;
-      chain[i].position = a - delta;
-      chain[i + 1].position = b + delta;
+      chain[i].positions[0] = a - delta;
+      chain[i + 1].positions[0] = b + delta;
     }
   }
 }
