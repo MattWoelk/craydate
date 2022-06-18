@@ -142,9 +142,8 @@ async fn main(mut api: craydate::Api) -> ! {
   let mut weapons = vec![
     Weapon {
       chain: vec![
-        ChainPoint::new(75.).blur(true),
-        ChainPoint::new(30.).blur(true),
-        ChainPoint::new(30.).blur(true),
+        ChainPoint::new(75.),
+        ChainPoint::new(30.),
         ChainPoint::new(30.).blur(true),
         ChainPoint::new(75.),
       ],
@@ -163,11 +162,21 @@ async fn main(mut api: craydate::Api) -> ! {
         ChainPoint::new(15.),
         ChainPoint::new(15.),
         ChainPoint::new(15.).blur(true),
-        ChainPoint::new(30.),
+        ChainPoint::new(15.),
       ],
       handle_length: 75.,
       stiffness: 20,
       blur_frames: 4,
+    },
+    Weapon {
+      chain: vec![
+        ChainPoint::new(30.),
+        ChainPoint::new(125.).blur(true),
+        ChainPoint::new(125.), // TODO: why is this required ??? Does the length on the last one not matter? Hmm.....
+      ],
+      handle_length: 75.,
+      stiffness: 10,
+      blur_frames: 2,
     },
   ];
 
