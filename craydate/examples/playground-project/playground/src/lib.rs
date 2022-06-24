@@ -18,6 +18,7 @@ struct ChainPoint {
   /// 0 is the most recent
   positions: Vec<Vec2<f32>>,
   length: f32,
+  angle_constraint: Option<f32>,
   blur: bool,
 }
 
@@ -26,6 +27,7 @@ impl ChainPoint {
     ChainPoint {
       positions: vec![Vec2::default(); 20], // TODO: make 20 into blur_frames
       length,
+      angle_constraint: None,
       blur: false,
       ..Default::default()
     }
@@ -33,6 +35,11 @@ impl ChainPoint {
 
   fn blur(mut self, blur: bool) -> Self {
     self.blur = blur;
+    self
+  }
+
+  fn angle_constraint(mut self, angle_constraint: f32) -> Self {
+    self.angle_constraint = Some(angle_constraint);
     self
   }
 }
@@ -153,16 +160,16 @@ async fn main(mut api: craydate::Api) -> ! {
     },
     Weapon {
       chain: vec![
-        ChainPoint::new(75.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.),
-        ChainPoint::new(15.).blur(true),
-        ChainPoint::new(15.),
+        ChainPoint::new(75.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.).blur(true),
+        ChainPoint::new(15.).angle_constraint(PI / 4.),
       ],
       handle_length: 75.,
       stiffness: 20,
@@ -261,6 +268,9 @@ async fn main(mut api: craydate::Api) -> ! {
     move_chain(&mut chain, chain_start, blur_frames);
     for _ in 0..stiffness {
       constrain_chain_lengths(&mut chain);
+    }
+    for _ in 0..stiffness {
+      constrain_chain_angles(&mut chain, p_to_v(&origin), &mut api.graphics);
     }
 
     // Draw Chain
@@ -368,7 +378,7 @@ fn constrain_chain_lengths(chain: &mut [ChainPoint]) {
     let a = chain[i].positions[0];
     let b = chain[i + 1].positions[0];
     let delta = b - a;
-    let distance = (delta.x * delta.x + delta.y * delta.y).sqrt();
+    let distance = magnitude(&delta); // (delta.x * delta.x + delta.y * delta.y).sqrt();
     let link_length = chain[i + 1].length;
     let fraction = ((link_length - distance) / distance) / 2.;
     if fraction < 0.0 {
@@ -377,4 +387,108 @@ fn constrain_chain_lengths(chain: &mut [ChainPoint]) {
       chain[i + 1].positions[0] = b + delta;
     }
   }
+}
+
+fn constrain_chain_angles(
+  chain: &mut [ChainPoint],
+  handle_origin: Vec2<f32>,
+  graphics: &mut Graphics,
+) {
+  if chain.len() < 2 {
+    return;
+  }
+
+  let first = chain[0].positions[0] - handle_origin;
+  let second = chain[1].positions[0] - chain[0].positions[0];
+
+  if let Some(constraint_angle) = chain[0].angle_constraint {
+    chain[1].positions[0] =
+      constrain_chain_angle(&first, &second, constraint_angle, chain, graphics, 0);
+  }
+
+  for i in 1..(chain.len() - 1) {
+    if let Some(constraint_angle) = chain[i].angle_constraint {
+      let a = chain[i].positions[0] - chain[i - 1].positions[0];
+      let b = chain[i + 1].positions[0] - chain[i].positions[0];
+      chain[i + 1].positions[0] =
+        constrain_chain_angle(&a, &b, constraint_angle, chain, graphics, i);
+    }
+  }
+}
+
+fn constrain_chain_angle(
+  first: &Vec2<f32>,
+  second: &Vec2<f32>,
+  constraint_angle: f32,
+  chain: &mut [ChainPoint],
+  graphics: &mut Graphics,
+  index: usize,
+) -> Vec2<f32> {
+  let theta = f32::atan2(first.y, first.x);
+  // angle of the handle
+  let theta = if theta > PI { theta - PI } else { theta };
+  let theta = if theta < -PI { theta + PI } else { theta };
+  let q = f32::atan2(second.y, second.x);
+  // angle of the handle
+  //let q = if q > PI { q - PI } else { q };
+  //let q = if q < -PI { q + PI } else { q };
+  let p = theta - q;
+  let p = if p > PI { p - PI } else { p };
+  let p = if p < -PI { p + PI } else { p };
+  let which_side = cross_mag(&first, &second);
+  //let phi = theta + constraint_angle;
+  //let phi = if p > PI
+  let phi = if which_side > 0. {
+    theta + constraint_angle
+  } else {
+    theta - constraint_angle
+  };
+  //let phi = if phi > PI { phi - PI } else { phi };
+  //let phi = if phi < -PI { phi + PI } else { phi };
+  let new_vector = Vec2::new(
+    chain[index + 1].length * phi.cos(),
+    chain[index + 1].length * phi.sin(),
+  );
+  let new_pos = new_vector + chain[index].positions[0];
+  graphics.draw_line(
+    v_to_p(&chain[index].positions[0]),
+    v_to_p(&new_pos),
+    3,
+    Color::Solid(SolidColor::kColorWhite),
+  );
+
+  if normalize(&first).dot(&normalize(&second)) < normalize(&first).dot(&normalize(&new_vector)) {
+    new_pos
+  } else {
+    chain[index + 1].positions[0]
+  }
+}
+
+/// the magnitude of the cross product
+fn cross_mag(v1: &Vec2<f32>, v2: &Vec2<f32>) -> f32 {
+  (v1.x * v2.y) - (v1.y * v2.x)
+}
+
+fn magnitude(v: &Vec2<f32>) -> f32 {
+  (v.x * v.x + v.y * v.y).sqrt()
+}
+
+fn normalize(v: &Vec2<f32>) -> Vec2<f32> {
+  v / magnitude(v)
+}
+
+fn bisect(v1: &Vec2<f32>, v2: &Vec2<f32>) -> Vec2<f32> {
+  normalize(&(normalize(&v1) + normalize(&v2)))
+}
+
+fn reflect(v: &Vec2<f32>, normal: &Vec2<f32>) -> Vec2<f32> {
+  let normal = normalize(normal);
+  v - (2. * (&v.dot(&normal)) * normal)
+}
+
+fn rotate(v: &Vec2<f32>, old: &Vec2<f32>, new: &Vec2<f32>) -> Vec2<f32> {
+  let x = bisect(&old, &new);
+  let y = reflect(&v, &x);
+
+  reflect(&y, &new)
 }
