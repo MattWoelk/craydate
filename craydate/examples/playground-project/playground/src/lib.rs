@@ -46,6 +46,7 @@ impl ChainPoint {
 
 struct Weapon {
   chain: Vec<ChainPoint>,
+  name: String,
   handle_length: f32, // TODO: use this
   stiffness: i32,
   blur_frames: usize,
@@ -157,6 +158,7 @@ async fn main(mut api: craydate::Api) -> ! {
       handle_length: 75.,
       stiffness: 10,
       blur_frames: 1,
+      name: "Nunchucks".into(),
     },
     Weapon {
       chain: vec![
@@ -174,6 +176,7 @@ async fn main(mut api: craydate::Api) -> ! {
       handle_length: 75.,
       stiffness: 20,
       blur_frames: 4,
+      name: "Whip".into(),
     },
     Weapon {
       chain: vec![
@@ -184,6 +187,7 @@ async fn main(mut api: craydate::Api) -> ! {
       handle_length: 75.,
       stiffness: 10,
       blur_frames: 2,
+      name: "Sword".into(),
     },
   ];
 
@@ -324,6 +328,9 @@ async fn main(mut api: craydate::Api) -> ! {
 
     // Draw fps
     api.graphics.draw_fps(400 - 15, 0);
+
+    // Draw Weapon Name
+    api.graphics.draw_text(&weapons[current_weapon].name, 3, 3)
   }
 }
 
