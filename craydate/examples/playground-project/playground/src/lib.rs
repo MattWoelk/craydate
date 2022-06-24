@@ -151,8 +151,8 @@ async fn main(mut api: craydate::Api) -> ! {
       chain: vec![
         ChainPoint::new(75.),
         ChainPoint::new(30.),
-        ChainPoint::new(30.).blur(true),
-        ChainPoint::new(75.),
+        ChainPoint::new(30.),
+        ChainPoint::new(75.).blur(true),
       ],
       handle_length: 75.,
       stiffness: 10,
@@ -168,8 +168,8 @@ async fn main(mut api: craydate::Api) -> ! {
         ChainPoint::new(15.).angle_constraint(PI / 4.),
         ChainPoint::new(15.).angle_constraint(PI / 4.),
         ChainPoint::new(15.).angle_constraint(PI / 4.),
-        ChainPoint::new(15.).angle_constraint(PI / 4.).blur(true),
         ChainPoint::new(15.).angle_constraint(PI / 4.),
+        ChainPoint::new(15.).angle_constraint(PI / 4.).blur(true),
       ],
       handle_length: 75.,
       stiffness: 20,
@@ -178,8 +178,8 @@ async fn main(mut api: craydate::Api) -> ! {
     Weapon {
       chain: vec![
         ChainPoint::new(30.),
-        ChainPoint::new(125.).blur(true),
-        ChainPoint::new(125.), // TODO: why is this required ??? Does the length on the last one not matter? Hmm.....
+        ChainPoint::new(125.),
+        ChainPoint::new(125.).blur(true), // TODO: why is this required ??? Does the length on the last one not matter? Hmm.....
       ],
       handle_length: 75.,
       stiffness: 10,
@@ -279,7 +279,7 @@ async fn main(mut api: craydate::Api) -> ! {
         v_to_p(&links[0].positions[0]),
         v_to_p(&links[1].positions[0]),
         3,
-        Color::Solid(if links[0].blur {
+        Color::Solid(if links[1].blur {
           SolidColor::kColorWhite
         } else {
           SolidColor::kColorBlack
@@ -290,7 +290,7 @@ async fn main(mut api: craydate::Api) -> ! {
     // Draw motion blur
     for p in 0..blur_frames {
       for l in 0..chain.len() - 1 {
-        if chain[l].blur {
+        if chain[l + 1].blur {
           api.graphics.fill_polygon(
             &[
               v_to_p(&chain[l].positions[p]),
