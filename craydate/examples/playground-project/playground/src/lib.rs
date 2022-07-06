@@ -180,14 +180,24 @@ async fn main(mut api: craydate::Api) -> ! {
     },
     Weapon {
       chain: vec![
+        ChainPoint::new(125.), // TODO: <-- this one feels redundant. Either that, or we should get rid of handle_length
         ChainPoint::new(30.),
-        ChainPoint::new(125.),
-        ChainPoint::new(125.).blur(true), // TODO: why is this required ??? Does the length on the last one not matter? Hmm.....
+        ChainPoint::new(125.).blur(true),
       ],
-      handle_length: 75.,
+      handle_length: 125.,
       stiffness: 10,
       blur_frames: 2,
       name: "Sword".into(),
+    },
+    Weapon {
+      chain: vec![
+        ChainPoint::new(150.).blur(true),
+        ChainPoint::new(1.).blur(true),
+      ],
+      handle_length: 150.,
+      stiffness: 10,
+      blur_frames: 2,
+      name: "Gentleman's Glove".into(),
     },
   ];
 
@@ -247,7 +257,7 @@ async fn main(mut api: craydate::Api) -> ! {
 
         shield_offset = (shield_offset - angle_delta).clamp(-190., 0.);
 
-        let length = 75f32;
+        let length = weapons[current_weapon].handle_length;
         let direction: Point2D<i32, UnknownUnit> =
           Point2D::new((angle.cos() * length) as i32, (angle.sin() * length) as i32);
 
